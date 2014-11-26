@@ -1,0 +1,14 @@
+.*.swp
+._*
+.DS_Store
+.git
+.hg
+.lock-wscript
+.svn
+.wafpickle-*
+.idea
+CVS
+npm-debug.log
+test
+node_modules
+example
