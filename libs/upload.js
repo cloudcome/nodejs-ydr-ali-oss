@@ -6,13 +6,11 @@
 
 'use strict';
 
-//var oss = require('oss-client');
 var auth = require('./auth.js');
 var path = require('path');
 var fs = require('fs');
 var request = require('request');
 var ydrUtil = require('ydr-util');
-
 
 module.exports = function () {
 
@@ -20,46 +18,36 @@ module.exports = function () {
 
 
 ////////////////////////////////////////////////////////
+var ossConfig = fs.readFileSync('/Users/zhangyunlai/Documents/aliyun/oss/key.json', 'utf8');
+ossConfig = JSON.parse(ossConfig);
 var bucket = 'ydrimg';
 var object = 'test/xx.png';
 var url = 'http://ydrimg.oss-cn-hangzhou.aliyuncs.com/' + object;
 var file = path.join(__dirname, '../test/x.png');
+var expires = Date.now() + 10000;
 var headers = {
     'Content-MD5': '',
     'Content-Type': 'image/png',
-    Date: new Date().toUTCString()
+    Date: new Date().toUTCString(),
+    'expires': new Date(expires).toUTCString(),
+    'cache-control': 'public'
 };
 
 
 ydrUtil.dato.extend(headers, auth({
-    accessKeyId: 'hLtdWgRPpKcj6Ezv',
-    accessKeySecret: 'uoC6D82o4VkE5mInBT8eDOsCFZCEj0',
+    accessKeyId: ossConfig.accessKeyId,
+    accessKeySecret: ossConfig.accessKeySecret,
     bucket: 'ydrimg',
     object: object,
     method: 'PUT'
 }, headers));
 
-//console.log(headers);
 
 ydrUtil.request.put(url, {
     headers: headers,
     file: file
 }, function (err, body, res) {
-    console.log(res.statusCode);
-    console.log(res.headers);
+    ydrUtil.request.head(url, function (err, headers) {
+        console.log(headers);
+    });
 });
-
-//
-//var OSS = require('oss-client');
-//var option = {
-//    accessKeyId: 'hLtdWgRPpKcj6Ezv',
-//    accessKeySecret: 'uoC6D82o4VkE5mInBT8eDOsCFZCEj0'
-//};
-//var oss = new OSS.create(option);
-//oss.putObject({
-//    bucket: bucket,
-//    object: object,
-//    srcFile: file
-//}, function(err) {
-//    console.log(err);
-//});

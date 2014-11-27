@@ -4,11 +4,23 @@
  * @create 2014-11-26 23:32
  */
 
+//在put object或者copy的时候都可以自定义head的。
+//java版本示例 public void putObject(String bucketName, String key, String filePath)
+//throws FileNotFoundException {
+// 初始化OSSClient OSSClient client = ...;
+// 获取指定文件的输入流 File file = new File(filePath);
+// InputStream content = new FileInputStream(file);
+// 创建上传Object的Metadata ObjectMetadata meta = new ObjectMetadata();
+// meta.addUserMetadata("Access-Control-Allow-Origin","*");
+// 必须设置ContentLength meta.setContentLength(file.length());
+// 上传Object. PutObjectResult result = client.putObject(bucketName, key, content, meta);
+// 打印ETag System.out.println(result.getETag());}
+// meta.addUserMetadata 中就可以增加Access-Control-Allow-Origin的设置。
+
 'use strict';
 
 var dato = require('ydr-util').dato;
 var crypto = require('crypto');
-var REG_HTTP = /^http:\//i;
 
 /**
  * get author header
