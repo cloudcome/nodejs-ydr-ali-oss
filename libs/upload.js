@@ -18,8 +18,6 @@ module.exports = function () {
 
 
 ////////////////////////////////////////////////////////
-var ossConfig = fs.readFileSync('/Users/zhangyunlai/Documents/aliyun/oss/key.json', 'utf8');
-ossConfig = JSON.parse(ossConfig);
 var bucket = 'ydrimg';
 var object = 'test/xx.png';
 var url = 'http://ydrimg.oss-cn-hangzhou.aliyuncs.com/' + object;
@@ -35,8 +33,8 @@ var headers = {
 
 
 ydrUtil.dato.extend(headers, auth({
-    accessKeyId: ossConfig.accessKeyId,
-    accessKeySecret: ossConfig.accessKeySecret,
+    accessKeyId: '',
+    accessKeySecret: '',
     bucket: 'ydrimg',
     object: object,
     method: 'PUT'
