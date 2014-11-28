@@ -6,10 +6,14 @@
 
 'use strict';
 
+var path = require('path');
 var klass = require('ydr-util').class;
 var dato = require('ydr-util').dato;
 var typeis = require('ydr-util').typeis;
 var request = require('ydr-util').request;
+var request2 = require('request');
+var crypto = require('ydr-util').crypto;
+var mime = require('ydr-util').mime;
 var auth = require('./libs/auth.js');
 var REG_META = /^x-oss-meta-/i;
 var constructorDefaults = {
@@ -47,6 +51,21 @@ module.exports = klass.create({
     },
 
 
+    //在put object或者copy的时候都可以自定义head的。
+    //java版本示例 public void putObject(String bucketName, String key, String filePath)
+    //throws FileNotFoundException {
+    // 初始化OSSClient OSSClient client = ...;
+    // 获取指定文件的输入流 File file = new File(filePath);
+    // InputStream content = new FileInputStream(file);
+    // 创建上传Object的Metadata ObjectMetadata meta = new ObjectMetadata();
+    // meta.addUserMetadata("Access-Control-Allow-Origin","*");
+    // 必须设置ContentLength meta.setContentLength(file.length());
+    // 上传Object. PutObjectResult result = client.putObject(bucketName, key, content, meta);
+    // 打印ETag System.out.println(result.getETag());}
+    // meta.addUserMetadata 中就可以增加Access-Control-Allow-Origin的设置。
+
+
+
     /**
      * 文件上传
      * @param file
@@ -54,13 +73,22 @@ module.exports = klass.create({
      * @param [options.expires] 1年 365*24*60*60*1000
      * @param [options.cache='public']
      * @param [options.meta=null]
+     * @param [options.name=null] 默认为文件名称
      * @param callback
      */
     uploadFile: function (file, options, callback) {
         var the = this;
+        var extname = path.extname(file);
+        var contentType = mime.get(extname);
 
         options = dato.extend(true, {}, uploadFileDefaults, options);
+
+        var url = the._createURL(options.name || path.basename(file));
+
         the._cleanMeta(options);
+        request.put(url, {
+            headers: {}
+        });
     },
 
 
@@ -93,12 +121,12 @@ module.exports = klass.create({
 
     /**
      * 配置跨域
-     * @param rules {Array|Obejct}
-     * @param callback
+     * @param rules {Array|Object} 单个或多个规则
+     * @param callback {Function}
      */
     setCrosRule: function (rules, callback) {
         var xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-        var url = this._createURL();
+        var url = this._createURL() + '/?cors';
         var hasError = false;
 
         xml += '<CORSConfiguration>\n';
@@ -174,13 +202,17 @@ module.exports = klass.create({
             method: 'put'
         });
         var headers = {
-            'Content-MD5': '',
-            'content-length': xml.length,
-            Date: new Date().toUTCString()
+            Host: this._options.bucket + '.' + this._options.host,
+            'Content-Md5': crypto.md5(xml),
+            'Content-Type': 'application/xml',
+            'Content-Length': xml.length
         };
         this._sign(options, headers);
-        console.log(xml);
 
+        console.log(url);
+        console.log(options);
+        console.log(headers);
+        console.log(xml);
         request.put(url, {
             body: xml,
             headers: headers
@@ -231,17 +263,17 @@ module.exports = klass.create({
     }
 });
 
-//var oss = new module.exports({
-//    accessKeyId: '',
-//    accessKeySecret: '',
-//    bucket: 'ydrimg',
-//    host: 'oss-cn-hangzhou.aliyuncs.com'
-//});
-//
-//oss.setCrosRule({
-//    AllowedOrigin: '*',
-//    AllowedMethod: 'get'
-//}, function (err, body) {
-//    console.log(err);
-//    console.log(body);
-//});
+var oss = new module.exports({
+    accessKeyId: '',
+    accessKeySecret: '',
+    bucket: 'ydrimg',
+    host: 'oss-cn-hangzhou.aliyuncs.com'
+});
+
+oss.setCrosRule({
+    AllowedOrigin: '*',
+    AllowedMethod: 'get'
+}, function (err, body) {
+    console.log(err);
+    console.log(body);
+});
