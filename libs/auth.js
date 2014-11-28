@@ -4,18 +4,6 @@
  * @create 2014-11-26 23:32
  */
 
-//在put object或者copy的时候都可以自定义head的。
-//java版本示例 public void putObject(String bucketName, String key, String filePath)
-//throws FileNotFoundException {
-// 初始化OSSClient OSSClient client = ...;
-// 获取指定文件的输入流 File file = new File(filePath);
-// InputStream content = new FileInputStream(file);
-// 创建上传Object的Metadata ObjectMetadata meta = new ObjectMetadata();
-// meta.addUserMetadata("Access-Control-Allow-Origin","*");
-// 必须设置ContentLength meta.setContentLength(file.length());
-// 上传Object. PutObjectResult result = client.putObject(bucketName, key, content, meta);
-// 打印ETag System.out.println(result.getETag());}
-// meta.addUserMetadata 中就可以增加Access-Control-Allow-Origin的设置。
 
 'use strict';
 
@@ -46,14 +34,14 @@ var crypto = require('crypto');
  */
 module.exports = function (options, headers) {
     var auth = 'OSS ' + options.accessKeyId + ':';
-    var date = new Date().toUTCString();
+    var date = headers.Date || new Date().toUTCString();
     var params = [
         options.method.toUpperCase(),
-        headers['Content-MD5'],
+        headers['Content-Md5'],
         headers['Content-Type'],
         date
     ];
-    var resource = '/' + options.bucket + '/' + options.object;
+    var resource = '/' + options.bucket + (options.object ? '/' + options.object : '');
     var ossHeaders = {};
     var signature;
 
@@ -78,3 +66,32 @@ module.exports = function (options, headers) {
         Date: date
     };
 };
+
+//PUT /nelson HTTP/1.0
+//Content-Md5: ODBGOERFMDMzQTczRUY3NUE3NzA5QzdFNUYzMDQxNEM=
+//Content-Type: text/html
+//Date: Thu, 17 Nov 2005 18:49:58 GMT
+//Host: oss-example.oss-cn-hangzhou.aliyuncs.com
+//X-OSS-Meta-Author: foo@bar.com
+//X-OSS-Magic: abracadabra
+
+// Authorization:OSS 44CF9590006BF252F707: 26NBxoKdsyly4EDv6inkoDft/yA=
+
+//{ Authorization: 'OSS 44CF9590006BF252F707:26NBxoKdsyly4EDv6inkoDft/yA=',
+//    Date: 'Thu, 17 Nov 2005 18:49:58 GMT' }
+
+//var  a = module.exports({
+//    method: 'PUT',
+//    accessKeyId: '44CF9590006BF252F707',
+//    accessKeySecret: 'OtxrzxIsfpFjA7SwPzILwy8Bw21TLhquhboDYROV',
+//    bucket: 'oss-example',
+//    object: 'nelson'
+//}, {
+//    'Content-Md5':'ODBGOERFMDMzQTczRUY3NUE3NzA5QzdFNUYzMDQxNEM=',
+//    'Content-Type': 'text/html',
+//    Date: 'Thu, 17 Nov 2005 18:49:58 GMT',
+//    Host: 'oss-example.oss-cn-hangzhou.aliyuncs.com',
+//    'X-OSS-Meta-Author': 'foo@bar.com',
+//    'X-OSS-Magic': 'abracadabra'
+//});
+//console.log(a);
