@@ -11,8 +11,6 @@ var dato = require('ydr-util').dato;
 var crypto = require('crypto');
 
 /**
- * get author header
- *
  * "Authorization: OSS " + Access Key Id + ":" + Signature
  *
  * Signature = base64(hmac-sha1(Access Key Secret + "\n"
@@ -30,6 +28,9 @@ var crypto = require('crypto');
  * @param {String} options.object
  * @param {String} options.method
  * @param {Object} headers 请求头
+ * @param {String} [headers.Date] 请求时间
+ * @param {String} headers['Content-Md5'] 请求内容的 MD5
+ * @param {String} headers['Content-Type'] 请求内容的类型
  * @return {Object}
  */
 module.exports = function (options, headers) {
@@ -41,7 +42,7 @@ module.exports = function (options, headers) {
         headers['Content-Type'],
         date
     ];
-    var resource = '/' + options.bucket + (options.object ? '/' + options.object : '');
+    var resource = '/' + options.bucket + '/' + options.object;
     var ossHeaders = {};
     var signature;
 
