@@ -231,3 +231,17 @@ module.exports = klass.create({
     }
 });
 
+//var oss = new module.exports({
+//    accessKeyId: '',
+//    accessKeySecret: '',
+//    bucket: 'ydrimg',
+//    host: 'oss-cn-hangzhou.aliyuncs.com'
+//});
+//
+//oss.setCrosRule({
+//    AllowedOrigin: '*',
+//    AllowedMethod: 'get'
+//}, function (err, body) {
+//    console.log(err);
+//    console.log(body);
+//});
