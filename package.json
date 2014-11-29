@@ -1,7 +1,6 @@
 {
   "name": "ydr-ali-oss",
   "version": "1.0.0",
-  "private": true,
   "description": "ali oss for ydr.me",
   "scripts": {},
   "preferGlobal": false,
@@ -9,8 +8,11 @@
   "main": "index.js",
   "keywords": [
     "cloudcome",
-    "oss",
-    "ydr.me"
+    "ydr.me",
+    "express",
+    "stream",
+    "ali",
+    "oss"
   ],
   "author": {
     "name": "cloudcome",
@@ -27,10 +29,10 @@
   },
   "dependencies": {
     "busboy": "^0.2.9",
-    "express": "^4.10.4",
-    "oss-client": "^0.5.1",
-    "request": "^2.48.0",
-    "ydr-util": "^1.9.10"
+    "howdo": "^1.1.4",
+    "imagesize": "^1.0.0",
+    "xml2js": "^0.4.4",
+    "ydr-util": "^1.10.4"
   },
   "devDependencies": {},
   "licenses": "MIT"
