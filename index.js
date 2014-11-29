@@ -25,7 +25,8 @@ var constructorDefaults = {
     host: 'oss-cn-hangzhou.aliyuncs.com'
 };
 var uploadDefaults = {
-    cacheControl: 'max-age=315360000,s-maxage=3600',
+    // 缓存期限 1年
+    cacheControl: 'max-age=315360000',
     // 不需要写 x-oss-meta- 前缀
     meta: null
 };
