@@ -12,30 +12,26 @@ var dato = require('ydr-util').dato;
 var typeis = require('ydr-util').typeis;
 var request = require('ydr-util').request;
 var Busboy = require('busboy');
-var crypto = require('ydr-util').crypto;
+var crypto = require('crypto');
 var mime = require('ydr-util').mime;
-var auth = require('./libs/auth.js');
+var xmlParse = require('xml2js').parseString;
+var howdo = require('howdo');
+var imagesize = require('imagesize');
 var REG_META = /^x-oss-meta-/i;
+var REG_TITLE = /<title>([\s\S]*?)<\/title>/;
 var constructorDefaults = {
     accessKeyId: '',
     accessKeySecret: '',
     bucket: '',
     host: 'oss-cn-hangzhou.aliyuncs.com'
 };
-var uploadFileDefaults = {
+var uploadDefaults = {
     expires: 365 * 24 * 60 * 60 * 1000,
-    cache: 'public',
+    cacheControl: 'public',
     // 不需要写 x-oss-meta- 前缀
     meta: null
 };
-var uploadStreamDefaults = {
-    expires: 365 * 24 * 60 * 60 * 1000,
-    cache: 'public',
-    // 必填
-    length: null,
-    // 不需要写 x-oss-meta- 前缀
-    meta: null
-};
+
 
 module.exports = klass.create({
     /**
@@ -50,18 +46,16 @@ module.exports = klass.create({
         this._options = dato.extend(true, {}, constructorDefaults, options);
     },
 
-    STATIC: {},
-
-    /**
-     * express 上传流中间件
-     * @param req
-     * @param res
-     * @param next
-     * @returns {*}
-     */
-    expressStream: function () {
-
-        return function (req, res, next) {
+    STATIC: {
+        /**
+         * express 中间件
+         * @param req
+         * @param res
+         * @param next
+         * @returns {*}
+         * @private
+         */
+        __express: function (req, res, next) {
             if (!(req.method === 'POST' || req.method === 'PUT')) {
                 return next();
             }
@@ -86,17 +80,17 @@ module.exports = klass.create({
             });
 
             // handle files
-            busboy.on('file', function (fieldName, fileStream, fileName, encoding, mimeType) {
+            busboy.on('file', function (fieldName, fileStream, fileName, encoding, contentType) {
                 if (!fileName) {
                     return fileStream.resume();
                 }
 
                 var upload = {
                     fieldName: fieldName,
-                    stream: fileStream,
+                    body: fileStream,
                     fileName: fileName,
                     encoding: encoding,
-                    mimeType: mimeType,
+                    contentType: contentType,
                     extname: path.extname(fileName)
                 };
                 req.uploads.push(upload);
@@ -110,80 +104,156 @@ module.exports = klass.create({
             busboy.on('error', next);
 
             req.pipe(busboy);
-        };
+        }
     },
 
+
+
     /**
-     * 文件上传
-     * @param file
+     * 上传文件
      * @param options
-     * @param [options.expires] 1年 365*24*60*60*1000
-     * @param [options.cache='public']
-     * @param [options.meta=null]
-     * @param [options.name=null] 默认为文件名称
+     * @param [options.expires=31536000000] 1年 365*24*60*60*1000，单位ms
+     * @param [options.cacheControl='public'] 缓存策略
+     * @param [options.meta=null] meta
+     * @param [options.object=null] 文件名称
+     * @param [options.contentType=null] 内容类型
+     * @param [options.file=null] 上传文件【优先级1】
+     * @param [options.body=null] 上传流【优先级2】
      * @param callback
      */
-    uploadFile: function (file, options, callback) {
+    upload: function (options, callback) {
         var the = this;
-        var extname = path.extname(file);
-        var contentType = mime.get(extname);
+        var date = new Date();
+
+        options = dato.extend(false, {}, uploadDefaults, options);
+        the._cleanMeta(options);
+
         var headers = {
+            date: date.toUTCString(),
+            expires: new Date(date.getTime() + options.expires).toUTCString(),
+            'content-type': options.contentType,
             'content-md5': '',
-            'content-type': contentType
+            'cache-control': options.cacheControl
         };
 
-        options = dato.extend(true, {}, uploadFileDefaults, options);
-
-        var url = the._createURL(options.name || path.basename(file));
-
-        the._cleanMeta(options);
-        request.put({
-            url: url,
-            headers: headers
+        dato.each(options.meta, function (key, val) {
+            headers['x-oss-meta-' + key] = val;
         });
-    },
 
+        options.url = this._createURL(options.object);
+        this._sign('put', options.object, headers);
+        options.headers = headers;
 
-    /**
-     * 流文件
-     * @param file
-     * @param options
-     * @param [options.expires] 1年 365*24*60*60*1000
-     * @param [options.cache='public']
-     * @param [options.meta=null]
-     * @param options.length
-     * @param callback
-     */
-    uploadStream: function (file, options, callback) {
-        var the = this;
-
-        options = dato.extend(true, {}, uploadStreamDefaults, options);
-
-        if (typeis(options.length) !== 'number') {
-            return callback(new Error('options.length must be a number'));
+        if (options.file) {
+            try {
+                options.body = fs.createReadStream(file);
+            } catch (err) {
+                return callback(err);
+            }
         }
 
-        if (options.length < 0) {
-            return callback(new Error('options.length must be great than 0'));
-        }
+        howdo
+            .task(function (done) {
+                imagesize(options.body, function (err, ret) {
+                    if (err) {
+                        return done(null, {
+                            image: false
+                        });
+                    }
 
-        the._cleanMeta(options);
+                    done(null, {
+                        image: true,
+                        type: ret.format,
+                        width: ret.width,
+                        height: ret.height
+                    });
+                });
+            })
+            .task(function (done) {
+                request.put(options, function (err, body, res) {
+                    if (err) {
+                        return done(err);
+                    }
+
+                    if (res.statusCode === 200) {
+                        return done(null, {
+                            url: options.url
+                        });
+                    }
+
+                    xmlParse(body, function (err, ret) {
+                        var msg = '';
+
+                        if (err) {
+                            msg = (body.match(REG_TITLE) || ['', ''])[1];
+
+                            return done(new Error(msg || 'parse upload result error'));
+                        }
+
+                        msg = ret && ret.Error && ret.Error.Message;
+                        msg = typeis(msg) === 'array' ? msg[0] : msg;
+                        done(new Error(msg));
+                    });
+                });
+            })
+            .together(function (err, retSize, retReq) {
+                if (err) {
+                    return callback(err);
+                }
+
+                callback(err, dato.extend(retSize, retReq));
+            });
     },
 
 
     /**
      * 头信息签名
-     * @param options
+     * @param method
+     * @param object
      * @param headers
      * @param headers['conten-type']
      * @param headers['conten-length']
      * @param headers['date']
      * @private
      */
-    _sign: function (options, headers) {
-        var authHeaders = auth(options, headers);
+    _sign: function (method, object, headers) {
+        var options = dato.extend(true, {}, this._options, {
+            method: method,
+            object: object
+        });
+        var auth = 'OSS ' + options.accessKeyId + ':';
+        var date = options.date || new Date().toUTCString();
+        var params = [
+            options.method.toUpperCase(),
+            headers['content-md5'],
+            headers['content-type'],
+            date
+        ];
+        var resource = '/' + options.bucket + options.object;
+        var ossHeaders = {};
+        var signature;
 
-        dato.extend(true, headers, authHeaders);
+        dato.each(headers, function (key, val) {
+            var lkey = key.toLowerCase().trim();
+
+            if (lkey.indexOf('x-oss-') === 0) {
+                ossHeaders[lkey] = ossHeaders[lkey] || [];
+                ossHeaders[lkey].push(val.trim());
+            }
+        });
+
+        Object.keys(ossHeaders).sort().forEach(function (key) {
+            params.push(key + ':' + ossHeaders[key].join(','));
+        });
+
+        params.push(resource);
+        signature = crypto.createHmac('sha1', options.accessKeySecret);
+        signature = signature.update(params.join('\n')).digest('base64');
+
+        return dato.extend(true, headers, {
+            Authorization: auth + signature,
+            Date: date
+        });
     },
 
 
@@ -214,10 +284,25 @@ module.exports = klass.create({
     }
 });
 
-var oss = new module.exports({
-    accessKeyId: 'yHB6upZj7OtPa1k2',
-    accessKeySecret: 'neiGkc55FJY0X0Q7cL7gL5pA3RlYvk',
-    bucket: 'ydrimg',
-    host: 'oss-cn-hangzhou.aliyuncs.com'
-});
-
+//var oss = new module.exports({
+//    accessKeyId: 'xxxxxxxxxxxx',
+//    accessKeySecret: 'xxxxxxxxxxxxxxxxxxxxxxxx',
+//    bucket: 'ydrimg',
+//    host: 'oss-cn-hangzhou.aliyuncs.com'
+//});
+//
+//var fs = require('fs');
+//var path = require('path');
+//var typeis = require('ydr-util').typeis;
+//var file = path.join(__dirname, './test/x.png');
+//var stream = fs.createReadStream(file);
+//var Stream = require('stream');
+//
+//oss.upload({
+//    object: '/x/x.png',
+//    contentType: 'image/png',
+//    body: stream
+//}, function (err, ret) {
+//    console.log(err);
+//    console.log(ret);
+//});
