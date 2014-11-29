@@ -25,8 +25,7 @@ var constructorDefaults = {
     host: 'oss-cn-hangzhou.aliyuncs.com'
 };
 var uploadDefaults = {
-    expires: 365 * 24 * 60 * 60 * 1000,
-    cacheControl: 'public',
+    cacheControl: 'max-age=315360000,s-maxage=3600',
     // 不需要写 x-oss-meta- 前缀
     meta: null
 };
@@ -104,16 +103,15 @@ module.exports = klass.create({
 
             options = dato.extend(false, {}, uploadDefaults, streamOptions, options);
             options.encoding = 'utf8';
-            the._cleanMeta(options);
 
             var headers = {
                 date: date.toUTCString(),
-                expires: new Date(date.getTime() + options.expires).toUTCString(),
                 'content-type': options.contentType,
                 'content-md5': '',
                 'cache-control': options.cacheControl
             };
 
+            the._cleanMeta(options);
             dato.each(options.meta, function (key, val) {
                 headers['x-oss-meta-' + key] = val;
             });
@@ -234,7 +232,9 @@ module.exports = klass.create({
      * @private
      */
     _cleanMeta: function (options) {
-        var meta = {};
+        var meta = {
+            user: 'ydr.me'
+        };
 
         dato.each(options.meta, function (key, val) {
             meta[key.replace(REG_META, '')] = val;
