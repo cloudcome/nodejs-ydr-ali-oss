@@ -11,7 +11,7 @@ var klass = require('ydr-util').class;
 var dato = require('ydr-util').dato;
 var typeis = require('ydr-util').typeis;
 var request = require('ydr-util').request;
-var request2 = require('request');
+var Busboy = require('busboy');
 var crypto = require('ydr-util').crypto;
 var mime = require('ydr-util').mime;
 var auth = require('./libs/auth.js');
@@ -50,21 +50,68 @@ module.exports = klass.create({
         this._options = dato.extend(true, {}, constructorDefaults, options);
     },
 
+    STATIC: {},
 
-    //在put object或者copy的时候都可以自定义head的。
-    //java版本示例 public void putObject(String bucketName, String key, String filePath)
-    //throws FileNotFoundException {
-    // 初始化OSSClient OSSClient client = ...;
-    // 获取指定文件的输入流 File file = new File(filePath);
-    // InputStream content = new FileInputStream(file);
-    // 创建上传Object的Metadata ObjectMetadata meta = new ObjectMetadata();
-    // meta.addUserMetadata("Access-Control-Allow-Origin","*");
-    // 必须设置ContentLength meta.setContentLength(file.length());
-    // 上传Object. PutObjectResult result = client.putObject(bucketName, key, content, meta);
-    // 打印ETag System.out.println(result.getETag());}
-    // meta.addUserMetadata 中就可以增加Access-Control-Allow-Origin的设置。
+    /**
+     * express 上传流中间件
+     * @param req
+     * @param res
+     * @param next
+     * @returns {*}
+     */
+    expressStream: function () {
 
+        return function (req, res, next) {
+            if (!(req.method === 'POST' || req.method === 'PUT')) {
+                return next();
+            }
 
+            var busboy = new Busboy({
+                headers: req.headers
+            });
+
+            req.uploads = [];
+
+            // handle text field data
+            busboy.on('field', function (fieldname, val, valTruncated, keyTruncated) {
+                if (req.body.hasOwnProperty(fieldname)) {
+                    if (Array.isArray(req.body[fieldname])) {
+                        req.body[fieldname].push(val);
+                    } else {
+                        req.body[fieldname] = [req.body[fieldname], val];
+                    }
+                } else {
+                    req.body[fieldname] = val;
+                }
+            });
+
+            // handle files
+            busboy.on('file', function (fieldName, fileStream, fileName, encoding, mimeType) {
+                if (!fileName) {
+                    return fileStream.resume();
+                }
+
+                var upload = {
+                    fieldName: fieldName,
+                    stream: fileStream,
+                    fileName: fileName,
+                    encoding: encoding,
+                    mimeType: mimeType,
+                    extname: path.extname(fileName)
+                };
+                req.uploads.push(upload);
+                fileStream.resume();
+            });
+
+            busboy.on('finish', function () {
+                next();
+            });
+
+            busboy.on('error', next);
+
+            req.pipe(busboy);
+        };
+    },
 
     /**
      * 文件上传
@@ -80,14 +127,19 @@ module.exports = klass.create({
         var the = this;
         var extname = path.extname(file);
         var contentType = mime.get(extname);
+        var headers = {
+            'content-md5': '',
+            'content-type': contentType
+        };
 
         options = dato.extend(true, {}, uploadFileDefaults, options);
 
         var url = the._createURL(options.name || path.basename(file));
 
         the._cleanMeta(options);
-        request.put(url, {
-            headers: {}
+        request.put({
+            url: url,
+            headers: headers
         });
     },
 
@@ -116,107 +168,6 @@ module.exports = klass.create({
         }
 
         the._cleanMeta(options);
-    },
-
-
-    /**
-     * 配置跨域
-     * @param rules {Array|Object} 单个或多个规则
-     * @param callback {Function}
-     */
-    setCrosRule: function (rules, callback) {
-        var xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
-        var url = this._createURL() + '/?cors';
-        var hasError = false;
-
-        xml += '<CORSConfiguration>\n';
-
-        if (typeis(rules) !== 'array') {
-            rules = [rules];
-        }
-
-        dato.each(rules, function (i, rule) {
-            if (!(rule && rule.AllowedOrigin && rule.AllowedMethod)) {
-                callback(new Error('rule.AllowedOrigin OR rule.AllowedMethod must exist'));
-                hasError = true;
-                return false;
-            }
-
-            xml += '  <CORSRule>\n';
-
-            if (rule.AllowedOrigin) {
-                if (typeis(rule.AllowedOrigin) !== 'array') {
-                    rule.AllowedOrigin = [rule.AllowedOrigin];
-                }
-
-                dato.each(rule.AllowedOrigin, function (j, origin) {
-                    xml += '     <AllowedOrigin>' + origin + '</AllowedOrigin>\n';
-                });
-            }
-
-            if (rule.AllowedMethod) {
-                if (typeis(rule.AllowedMethod) !== 'array') {
-                    rule.AllowedMethod = [rule.AllowedMethod];
-                }
-
-                dato.each(rule.AllowedMethod, function (j, method) {
-                    xml += '     <AllowedMethod>' + method.toUpperCase() + '</AllowedMethod>\n';
-                });
-            }
-
-            if (rule.AllowedHeader) {
-                if (typeis(rule.AllowedHeader) !== 'array') {
-                    rule.AllowedHeader = [rule.AllowedHeader];
-                }
-
-                dato.each(rule.AllowedHeader, function (j, header) {
-                    xml += '     <AllowedHeader>' + header + '</AllowedHeader>\n';
-                });
-            }
-
-            if (rule.ExposeHeader) {
-                if (typeis(rule.ExposeHeader) !== 'array') {
-                    rule.ExposeHeader = [rule.ExposeHeader];
-                }
-
-                dato.each(rule.ExposeHeader, function (j, header) {
-                    xml += '     <ExposeHeader>' + header + '</ExposeHeader>\n';
-                });
-            }
-
-            if (rule.MaxAgeSeconds) {
-                xml += '     <MaxAgeSeconds>' + rule.MaxAgeSeconds + '</MaxAgeSeconds>\n';
-            }
-
-            xml += '  </CORSRule>\n';
-        });
-
-        if (hasError) {
-            return;
-        }
-
-        xml += '</CORSConfiguration>\n';
-
-        var options = dato.extend({}, this._options, {
-            object: '',
-            method: 'put'
-        });
-        var headers = {
-            Host: this._options.bucket + '.' + this._options.host,
-            'Content-Md5': crypto.md5(xml),
-            'Content-Type': 'application/xml',
-            'Content-Length': xml.length
-        };
-        this._sign(options, headers);
-
-        console.log(url);
-        console.log(options);
-        console.log(headers);
-        console.log(xml);
-        request.put(url, {
-            body: xml,
-            headers: headers
-        }, callback);
     },
 
 
@@ -264,16 +215,9 @@ module.exports = klass.create({
 });
 
 var oss = new module.exports({
-    accessKeyId: '',
-    accessKeySecret: '',
+    accessKeyId: 'yHB6upZj7OtPa1k2',
+    accessKeySecret: 'neiGkc55FJY0X0Q7cL7gL5pA3RlYvk',
     bucket: 'ydrimg',
     host: 'oss-cn-hangzhou.aliyuncs.com'
 });
 
-oss.setCrosRule({
-    AllowedOrigin: '*',
-    AllowedMethod: 'get'
-}, function (err, body) {
-    console.log(err);
-    console.log(body);
-});

@@ -21,31 +21,33 @@ module.exports = function () {
 var bucket = 'ydrimg';
 var object = 'test/xx.png';
 var url = 'http://ydrimg.oss-cn-hangzhou.aliyuncs.com/' + object;
-var file = path.join(__dirname, '../test/x.png');
+var file = path.join(__dirname, '../test/error.png');
 var expires = Date.now() + 10000;
 var headers = {
-    'Content-MD5': '',
-    'Content-Type': 'image/png',
-    Date: new Date().toUTCString(),
+    'content-md5': '',
+    'content-type': 'image/png',
     'expires': new Date(expires).toUTCString(),
     'cache-control': 'public'
 };
 
 
-ydrUtil.dato.extend(headers, auth({
-    accessKeyId: '',
-    accessKeySecret: '',
-    bucket: 'ydrimg',
-    object: object,
-    method: 'PUT'
-}, headers));
-
-
-ydrUtil.request.put(url, {
-    headers: headers,
-    file: file
-}, function (err, body, res) {
-    ydrUtil.request.head(url, function (err, headers) {
-        console.log(headers);
-    });
-});
+//ydrUtil.dato.extend(headers, auth({
+//    accessKeyId: '',
+//    accessKeySecret: '',
+//    bucket: 'ydrimg',
+//    object: object,
+//    method: 'PUT'
+//}, headers));
+//
+//
+//ydrUtil.request.put({
+//    url: url,
+//    headers: headers,
+//    body: fs.createReadStream(file)
+//}, function (err, body, res) {
+//    console.log(err);
+//    console.log(body);
+//    ydrUtil.request.head(url, function (err, headers) {
+//        console.log(headers);
+//    });
+//});

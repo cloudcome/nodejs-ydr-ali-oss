@@ -26,6 +26,7 @@
     "url": "https://github.com/cloudcome/nodejs-ydr-ali-oss/issues"
   },
   "dependencies": {
+    "busboy": "^0.2.9",
     "express": "^4.10.4",
     "oss-client": "^0.5.1",
     "request": "^2.48.0",

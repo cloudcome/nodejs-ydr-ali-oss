@@ -38,8 +38,8 @@ module.exports = function (options, headers) {
     var date = headers.Date || new Date().toUTCString();
     var params = [
         options.method.toUpperCase(),
-        headers['Content-Md5'],
-        headers['Content-Type'],
+        headers['content-md5'],
+        headers['content-type'],
         date
     ];
     var resource = '/' + options.bucket + '/' + options.object;
@@ -88,11 +88,11 @@ module.exports = function (options, headers) {
 //    bucket: 'oss-example',
 //    object: 'nelson'
 //}, {
-//    'Content-Md5':'ODBGOERFMDMzQTczRUY3NUE3NzA5QzdFNUYzMDQxNEM=',
-//    'Content-Type': 'text/html',
-//    Date: 'Thu, 17 Nov 2005 18:49:58 GMT',
-//    Host: 'oss-example.oss-cn-hangzhou.aliyuncs.com',
-//    'X-OSS-Meta-Author': 'foo@bar.com',
-//    'X-OSS-Magic': 'abracadabra'
+//    'content-md5':'ODBGOERFMDMzQTczRUY3NUE3NzA5QzdFNUYzMDQxNEM=',
+//    'content-type': 'text/html',
+//    date: 'Thu, 17 Nov 2005 18:49:58 GMT',
+//    host: 'oss-example.oss-cn-hangzhou.aliyuncs.com',
+//    'x-oss-meta-author': 'foo@bar.com',
+//    'x-oss-magic': 'abracadabra'
 //});
 //console.log(a);
