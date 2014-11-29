@@ -1,5 +1,5 @@
 /*!
- * 文件描述
+ * oss
  * @author ydr.me
  * @create 2014-11-27 21:47
  */
@@ -13,7 +13,6 @@ var typeis = require('ydr-util').typeis;
 var request = require('ydr-util').request;
 var Busboy = require('busboy');
 var crypto = require('crypto');
-var mime = require('ydr-util').mime;
 var xmlParse = require('xml2js').parseString;
 var howdo = require('howdo');
 var imagesize = require('imagesize');
@@ -46,163 +45,136 @@ module.exports = klass.create({
         this._options = dato.extend(true, {}, constructorDefaults, options);
     },
 
-    STATIC: {
-        /**
-         * express 中间件
-         * @param req
-         * @param res
-         * @param next
-         * @returns {*}
-         * @private
-         */
-        __express: function (req, res, next) {
-            if (!(req.method === 'POST' || req.method === 'PUT')) {
-                return next();
+    STATIC: {},
+
+
+    /**
+     * 中间件传输
+     * @param req
+     * @param callback
+     * @private
+     */
+    _pipe: function (req, callback) {
+        var busboy = new Busboy({
+            headers: req.headers
+        });
+
+        // handle files
+        busboy.on('file', function (fieldName, fileStream, fileName, encoding, contentType) {
+            if (!fileName) {
+                return fileStream.resume();
             }
 
-            var busboy = new Busboy({
-                headers: req.headers
-            });
+            var options = {
+                fieldName: fieldName,
+                body: fileStream,
+                fileName: fileName,
+                encoding: encoding,
+                contentType: contentType,
+                extname: path.extname(fileName)
+            };
 
-            req.uploads = [];
+            callback(null, options, fileStream);
+        });
 
-            // handle text field data
-            busboy.on('field', function (fieldname, val, valTruncated, keyTruncated) {
-                if (req.body.hasOwnProperty(fieldname)) {
-                    if (Array.isArray(req.body[fieldname])) {
-                        req.body[fieldname].push(val);
-                    } else {
-                        req.body[fieldname] = [req.body[fieldname], val];
-                    }
-                } else {
-                    req.body[fieldname] = val;
-                }
-            });
+        busboy.on('error', callback);
 
-            // handle files
-            busboy.on('file', function (fieldName, fileStream, fileName, encoding, contentType) {
-                if (!fileName) {
-                    return fileStream.resume();
-                }
-
-                var upload = {
-                    fieldName: fieldName,
-                    body: fileStream,
-                    fileName: fileName,
-                    encoding: encoding,
-                    contentType: contentType,
-                    extname: path.extname(fileName)
-                };
-                req.uploads.push(upload);
-                fileStream.resume();
-            });
-
-            busboy.on('finish', function () {
-                next();
-            });
-
-            busboy.on('error', next);
-
-            req.pipe(busboy);
-        }
+        req.pipe(busboy);
     },
-
 
 
     /**
      * 上传文件
-     * @param options
+     * @param req {Object} 请求对象
+     * @param options {Object} 配置
      * @param [options.expires=31536000000] 1年 365*24*60*60*1000，单位ms
      * @param [options.cacheControl='public'] 缓存策略
      * @param [options.meta=null] meta
      * @param [options.object=null] 文件名称
-     * @param [options.contentType=null] 内容类型
-     * @param [options.file=null] 上传文件【优先级1】
-     * @param [options.body=null] 上传流【优先级2】
      * @param callback
      */
-    upload: function (options, callback) {
-        var the = this;
+    upload: function (req, options, callback) {
         var date = new Date();
+        var the = this;
 
-        options = dato.extend(false, {}, uploadDefaults, options);
-        the._cleanMeta(options);
-
-        var headers = {
-            date: date.toUTCString(),
-            expires: new Date(date.getTime() + options.expires).toUTCString(),
-            'content-type': options.contentType,
-            'content-md5': '',
-            'cache-control': options.cacheControl
-        };
-
-        dato.each(options.meta, function (key, val) {
-            headers['x-oss-meta-' + key] = val;
-        });
-
-        options.url = this._createURL(options.object);
-        this._sign('put', options.object, headers);
-        options.headers = headers;
-
-        if (options.file) {
-            try {
-                options.body = fs.createReadStream(file);
-            } catch (err) {
+        the._pipe(req, function (err, streamOptions, fileStream) {
+            if (err) {
                 return callback(err);
             }
-        }
 
-        howdo
-            .task(function (done) {
-                imagesize(options.body, function (err, ret) {
-                    if (err) {
-                        return done(null, {
-                            image: false
-                        });
-                    }
+            options = dato.extend(false, {}, uploadDefaults, streamOptions, options);
+            options.encoding = 'utf8';
+            the._cleanMeta(options);
 
-                    done(null, {
-                        image: true,
-                        type: ret.format,
-                        width: ret.width,
-                        height: ret.height
-                    });
-                });
-            })
-            .task(function (done) {
-                request.put(options, function (err, body, res) {
-                    if (err) {
-                        return done(err);
-                    }
+            var headers = {
+                date: date.toUTCString(),
+                expires: new Date(date.getTime() + options.expires).toUTCString(),
+                'content-type': options.contentType,
+                'content-md5': '',
+                'cache-control': options.cacheControl
+            };
 
-                    if (res.statusCode === 200) {
-                        return done(null, {
-                            url: options.url
-                        });
-                    }
+            dato.each(options.meta, function (key, val) {
+                headers['x-oss-meta-' + key] = val;
+            });
 
-                    xmlParse(body, function (err, ret) {
-                        var msg = '';
+            options.url = the._createURL(options.object);
+            the._sign('put', options.object, headers);
+            options.headers = headers;
 
+            howdo
+                .task(function (done) {
+                    imagesize(options.body, function (err, ret) {
                         if (err) {
-                            msg = (body.match(REG_TITLE) || ['', ''])[1];
-
-                            return done(new Error(msg || 'parse upload result error'));
+                            return done(null, {
+                                image: false
+                            });
                         }
 
-                        msg = ret && ret.Error && ret.Error.Message;
-                        msg = typeis(msg) === 'array' ? msg[0] : msg;
-                        done(new Error(msg));
+                        done(null, {
+                            image: true,
+                            type: ret.format,
+                            width: ret.width,
+                            height: ret.height
+                        });
                     });
-                });
-            })
-            .together(function (err, retSize, retReq) {
-                if (err) {
-                    return callback(err);
-                }
+                })
+                .task(function (done) {
+                    request.put(options, function (err, body, res) {
+                        fileStream.resume();
+                        if (err) {
+                            return done(err);
+                        }
 
-                callback(err, dato.extend(retSize, retReq));
-            });
+                        if (res.statusCode === 200) {
+                            return done(null, {
+                                url: options.url
+                            });
+                        }
+
+                        xmlParse(body, function (err, ret) {
+                            var msg = '';
+
+                            if (err) {
+                                msg = (body.match(REG_TITLE) || ['', ''])[1];
+
+                                return next(new Error(msg || 'parse upload result error'));
+                            }
+
+                            msg = ret && ret.Error && ret.Error.Message;
+                            msg = typeis(msg) === 'array' ? msg[0] : msg;
+                            done(new Error(msg));
+                        });
+                    });
+                })
+                .together(function (err, retSize, retReq) {
+                    if (err) {
+                        return callback(err);
+                    }
+
+                    callback(err, dato.extend(retSize, retReq));
+                });
+        });
     },
 
 
@@ -283,26 +255,3 @@ module.exports = klass.create({
             (object ? object : '');
     }
 });
-
-//var oss = new module.exports({
-//    accessKeyId: 'xxxxxxxxxxxx',
-//    accessKeySecret: 'xxxxxxxxxxxxxxxxxxxxxxxx',
-//    bucket: 'ydrimg',
-//    host: 'oss-cn-hangzhou.aliyuncs.com'
-//});
-//
-//var fs = require('fs');
-//var path = require('path');
-//var typeis = require('ydr-util').typeis;
-//var file = path.join(__dirname, './test/x.png');
-//var stream = fs.createReadStream(file);
-//var Stream = require('stream');
-//
-//oss.upload({
-//    object: '/x/x.png',
-//    contentType: 'image/png',
-//    body: stream
-//}, function (err, ret) {
-//    console.log(err);
-//    console.log(ret);
-//});
