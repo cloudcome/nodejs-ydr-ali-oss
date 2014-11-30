@@ -149,7 +149,7 @@ module.exports = klass.create({
                         if (res.statusCode === 200) {
                             return done(null, {
                                 ourl: options.url,
-                                surl: options.domain ? 'http://' + options.domain + options.object : options.url
+                                surl: the._options.domain ? 'http://' + the._options.domain + options.object : options.url
                             });
                         }
 
