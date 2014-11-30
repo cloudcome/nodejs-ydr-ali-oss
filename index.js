@@ -11,6 +11,7 @@ var klass = require('ydr-util').class;
 var dato = require('ydr-util').dato;
 var typeis = require('ydr-util').typeis;
 var request = require('ydr-util').request;
+var mime = require('ydr-util').mime;
 var Busboy = require('busboy');
 var crypto = require('crypto');
 var xmlParse = require('xml2js').parseString;
@@ -66,13 +67,18 @@ module.exports = klass.create({
                 return fileStream.resume();
             }
 
+            var extname = path.extname(fileName);
+
+            if (extname) {
+                contentType = mime.get(extname);
+            }
+
             var options = {
                 fieldName: fieldName,
                 body: fileStream,
                 fileName: fileName,
                 encoding: encoding,
-                contentType: contentType,
-                extname: path.extname(fileName)
+                contentType: contentType
             };
 
             callback(null, options, fileStream);
