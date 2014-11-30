@@ -24,9 +24,12 @@ var constructorDefaults = {
     accessKeySecret: '',
     bucket: '',
     host: 'oss-cn-hangzhou.aliyuncs.com',
-    domain: ''
+    domain: '',
+    onbeforeput: function (streamOptions, next) {
+        next();
+    }
 };
-var uploadDefaults = {
+var putDefaults = {
     // 缓存期限 1年
     cacheControl: 'max-age=315360000',
     // 不需要写 x-oss-meta- 前缀
@@ -60,6 +63,7 @@ module.exports = klass.create({
         var busboy = new Busboy({
             headers: req.headers
         });
+        var the = this;
 
         // handle files
         busboy.on('file', function (fieldName, fileStream, fileName, encoding, contentType) {
@@ -81,7 +85,11 @@ module.exports = klass.create({
                 contentType: contentType
             };
 
-            callback(null, options, fileStream);
+            var next = function (err) {
+                callback(err, options, fileStream);
+            };
+
+            the._options.onbeforeput(options, next);
         });
 
         busboy.on('error', callback);
@@ -100,7 +108,7 @@ module.exports = klass.create({
      * @param [options.object=null] 文件名称
      * @param callback
      */
-    upload: function (req, options, callback) {
+    put: function (req, options, callback) {
         var date = new Date();
         var the = this;
 
@@ -109,7 +117,7 @@ module.exports = klass.create({
                 return callback(err);
             }
 
-            options = dato.extend(false, {}, uploadDefaults, streamOptions, options);
+            options = dato.extend(false, {}, putDefaults, streamOptions, options);
             options.encoding = 'utf8';
 
             var headers = {
