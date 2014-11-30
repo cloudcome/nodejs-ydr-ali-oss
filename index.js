@@ -22,7 +22,8 @@ var constructorDefaults = {
     accessKeyId: '',
     accessKeySecret: '',
     bucket: '',
-    host: 'oss-cn-hangzhou.aliyuncs.com'
+    host: 'oss-cn-hangzhou.aliyuncs.com',
+    domain: ''
 };
 var uploadDefaults = {
     // 缓存期限 1年
@@ -147,7 +148,8 @@ module.exports = klass.create({
 
                         if (res.statusCode === 200) {
                             return done(null, {
-                                url: options.url
+                                ourl: options.url,
+                                surl: options.domain ? 'http://' + options.domain + options.object : options.url
                             });
                         }
 
@@ -157,7 +159,7 @@ module.exports = klass.create({
                             if (err) {
                                 msg = (body.match(REG_TITLE) || ['', ''])[1];
 
-                                return next(new Error(msg || 'parse upload result error'));
+                                return done(new Error(msg || 'parse upload result error'));
                             }
 
                             msg = ret && ret.Error && ret.Error.Message;
