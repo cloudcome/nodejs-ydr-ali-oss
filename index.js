@@ -138,10 +138,11 @@ module.exports = klass.create({
                         }
 
                         done(null, {
-                            image: true,
-                            type: ret.format,
-                            width: ret.width,
-                            height: ret.height
+                            image: {
+                                type: ret.format,
+                                width: ret.width,
+                                height: ret.height
+                            }
                         });
                     });
                 })
@@ -154,6 +155,9 @@ module.exports = klass.create({
 
                         if (res.statusCode === 200) {
                             return done(null, {
+                                contentType: options.contentType,
+                                encoding: options.encoding,
+                                cacheControl: options.cacheControl,
                                 ourl: options.url,
                                 surl: the._options.domain ? 'http://' + the._options.domain + options.object : options.url
                             });
