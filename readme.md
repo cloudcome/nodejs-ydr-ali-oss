@@ -14,4 +14,6 @@ var oss = new YdrAliOss({
 		next();
 	}
 });
+
+oss.setOptions(key, val);
 ```

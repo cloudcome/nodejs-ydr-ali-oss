@@ -54,6 +54,18 @@ module.exports = klass.create({
 
 
     /**
+     * 重新设置配置
+     * @param key
+     * @param val
+     */
+    setOptions: function (key, val) {
+        var the = this;
+
+        the._options[key] = val;
+    },
+
+
+    /**
      * 中间件传输
      * @param req
      * @param callback
