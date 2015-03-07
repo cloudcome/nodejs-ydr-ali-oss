@@ -283,3 +283,5 @@ OSS.fn._createURL = function (object) {
     return 'http://' + this._options.bucket + '.' + this._options.host +
         (object ? object : '');
 };
+
+module.exports = OSS;
