@@ -1,6 +1,6 @@
 {
   "name": "ydr-ali-oss",
-  "version": "100.0.0",
+  "version": "101.0.0",
   "description": "ali oss for ydr.me",
   "scripts": {},
   "preferGlobal": false,
